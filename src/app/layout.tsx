@@ -20,8 +20,8 @@ const rajdhani = Rajdhani({
 });
 
 export const metadata: Metadata = {
-  title: "Jugo",
-  description: "Jugo — 工会会员数据监控大屏",
+  title: "3D Earth Model Monitor",
+  description: "Real-time globe visualization analytics dashboard",
 };
 
 import { GlobeSettingsProvider } from "@/components/GlobeSettingsContext";
