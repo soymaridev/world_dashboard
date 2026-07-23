@@ -1,5 +1,6 @@
 "use client";
 
+import type { InstancedMesh, Vector3 } from "three";
 import { useEffect, useRef } from "react";
 
 /* ────────────────────────────────────────────
@@ -65,6 +66,16 @@ async function initGlobe(
   const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
   const { bloom } = await import("three/examples/jsm/tsl/display/BloomNode.js");
   const gsap = (await import("gsap")).default;
+  type FlyLine = {
+    mesh: any;
+    geom: any;
+    mat: any;
+    progressU: any;
+    flowTimeU: any;
+    postFadeU: any;
+    arrived: boolean;
+    tween: ReturnType<typeof gsap.to> | null;
+  };
 
   if (signal.aborted) return;
 
@@ -148,7 +159,7 @@ async function initGlobe(
     return positions;
   }
 
-  function setMatrices(mesh: THREE.InstancedMesh, positions: number[][]) {
+  function setMatrices(mesh: InstancedMesh, positions: number[][]) {
     const matrix = new THREE.Matrix4();
     const quat = new THREE.Quaternion(), scale = new THREE.Vector3(1, 1, 1), pos = new THREE.Vector3(), normal = new THREE.Vector3(), zAxis = new THREE.Vector3(0, 0, 1);
     for (let i = 0; i < positions.length; i++) {
@@ -239,7 +250,7 @@ async function initGlobe(
     const baseTwinkled = baseTerm.mul(twinkleMul);
     material.colorNode = baseTwinkled;
     material.opacityNode = disk;
-    material.emissiveNode = baseTwinkled;
+    (material as any).emissiveNode = baseTwinkled;
     return material;
   }
 
@@ -299,12 +310,12 @@ async function initGlobe(
   const shieldMesh = new THREE.Mesh(shieldGeom, shieldMat);
   scene.add(shieldMesh);
 
-  const flyLines: any[] = [];
-  function addFlyLine(aW: THREE.Vector3, bW: THREE.Vector3, lineColor: string) {
+  const flyLines: FlyLine[] = [];
+  function addFlyLine(aW: Vector3, bW: Vector3, lineColor: string) {
     const progressU = uniform(0), flowTimeU = uniform(0), postFadeU = uniform(1), colorU = uniform(new THREE.Color(lineColor));
     const geom = buildRibbon(aW, bW, 0.18, THREE);
     const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide });
-    const lineDirW = attribute("direction", "vec3").transformDirection(modelWorldMatrix).normalize();
+    const lineDirW = (attribute("direction", "vec3") as any).transformDirection(modelWorldMatrix).normalize();
     const pW = modelWorldMatrix.mul(vec4(positionLocal, 1.0)).xyz;
     const toCam = cameraPosition.sub(pW).normalize();
     const rawC = cross(lineDirW, toCam);
@@ -316,18 +327,19 @@ async function initGlobe(
     const grown = float(1).sub(smoothstep(progressU.sub(uniform(0.05)), progressU, u0));
     const flowMask = smoothstep(uniform(0.15), float(0), fract(fract(flowTimeU.mul(uniform(2.0))).sub(u0)));
     const a0 = grown.mul(postFadeU).add(smoothstep(0.98, 1.0, progressU).mul(flowMask)).mul(lateralMask);
-    mat.colorNode = colorU.add(vec3(1,1,1).sub(colorU).mul(float(1).sub(smoothstep(float(0),float(0.55),vAbs)).pow(3).mul(uniform(1.35)))).mul(a0).mul(uniform(0.9));
+    const colorNode = colorU as any;
+    mat.colorNode = colorNode.add(vec3(1,1,1).sub(colorNode).mul(float(1).sub(smoothstep(float(0),float(0.55),vAbs)).pow(3).mul(uniform(1.35)))).mul(a0).mul(uniform(0.9));
     mat.opacityNode = a0;
     const mesh = new THREE.Mesh(geom, mat); scene.add(mesh);
-    const fl = { mesh, geom, mat, progressU, flowTimeU, postFadeU, arrived: false, tween: null };
+    const fl: FlyLine = { mesh, geom, mat, progressU, flowTimeU, postFadeU, arrived: false, tween: null };
     flyLines.push(fl); return fl;
   }
 
-  function buildRibbon(aUnit: THREE.Vector3, bUnit: THREE.Vector3, arcHeight: number, THREE_INST: any) {
+  function buildRibbon(aUnit: Vector3, bUnit: Vector3, arcHeight: number, THREE_INST: any) {
     const a = aUnit.clone().normalize(), b = bUnit.clone().normalize();
     const omega = Math.acos(THREE_INST.MathUtils.clamp(a.dot(b), -1, 1));
     const sinO = Math.sin(omega) || 1;
-    const pts: THREE.Vector3[] = [];
+    const pts: Vector3[] = [];
     for (let i = 0; i < 64; i++) {
       const t = i / 63;
       pts.push(new THREE_INST.Vector3().addScaledVector(a, Math.sin((1-t)*omega)/sinO).addScaledVector(b, Math.sin(t*omega)/sinO).multiplyScalar(1 + arcHeight*Math.sin(Math.PI*t)));
